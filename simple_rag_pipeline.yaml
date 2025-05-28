@@ -1,0 +1,7 @@
+version: ignore
+components:
+  - name: embedder
+    type: OpenAITextEmbedder
+    params:
+      model: text-embedding-ada-002
+connections: [] 

@@ -1,0 +1,313 @@
+# =================================================================
+# Haystack + OpenWebUI Docker Compose Configuration
+# =================================================================
+# This configuration sets up a complete AI application stack with:
+# - Hayhooks: Haystack pipeline server
+# - OpenWebUI: Modern chat interface
+# - Redis: Caching layer for performance
+
+services:
+  # =================================================================
+  # HAYHOOKS SERVICE - Haystack Pipeline Server
+  # =================================================================
+  hayhooks:
+    build:
+      context: ./hayhooks
+      dockerfile: Dockerfile
+    container_name: hayhooks
+    ports:
+      - "${HAYHOOKS_PORT:-1416}:1416" # Hayhooks API
+      - "8000:8000" # Direct Chat API
+    volumes:
+      - ./hayhooks/pipelines:/pipelines:ro
+      - ./data/documents:/data/documents
+      - ./data/uploads:/data/uploads
+      - hayhooks-logs:/logs
+    env_file:
+      - .env
+    environment:
+      - HAYHOOKS_HOST=${HAYHOOKS_HOST:-0.0.0.0}
+      - HAYHOOKS_PORT=${HAYHOOKS_PORT:-1416}
+      - HAYHOOKS_PIPELINES_DIR=${HAYHOOKS_PIPELINES_DIR:-/pipelines}
+      - HAYHOOKS_MAX_WORKERS=${HAYHOOKS_MAX_WORKERS:-4}
+      - HAYHOOKS_RELOAD=${HAYHOOKS_RELOAD:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=${LOG_FILE:-/logs/hayhooks.log}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:1416/status')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - haystack-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hayhooks.rule=PathPrefix(`/api`)"
+      - "traefik.http.services.hayhooks.loadbalancer.server.port=1416"
+
+  # =================================================================
+  # OPENWEBUI SERVICE - Modern Chat Interface
+  # =================================================================
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "${WEBUI_PORT:-3000}:8080"
+    volumes:
+      - ./open-webui/config:/app/backend/data
+      - ./data/uploads:/app/backend/uploads
+      - ./data/documents:/app/backend/documents:ro
+    env_file:
+      - .env
+    environment:
+      # OpenAI API Configuration - pointing to our custom API
+      - OPENAI_API_BASE_URL=http://hayhooks:8000/api
+      - OPENAI_API_KEY=haystack-api-key
+
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_ENABLED=true
+
+      # Additional API configurations
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+
+      # WebUI Authentication & Security
+      - WEBUI_AUTH=${WEBUI_AUTH:-false}
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-true}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY:-your-webui-secret-key}
+      - WEBUI_JWT_SECRET_KEY=${WEBUI_JWT_SECRET_KEY:-your-jwt-secret-key}
+      - DEFAULT_USER_ROLE=${DEFAULT_USER_ROLE:-user}
+
+      # Model Configuration
+      - DEFAULT_MODELS=haystack-rag
+      - DEFAULT_MODEL=haystack-rag
+      - MODEL_FILTER_LIST=haystack-rag
+      - ENABLE_MODEL_FILTER=${ENABLE_MODEL_FILTER:-true}
+
+      # Features Configuration
+      - ENABLE_COMMUNITY_SHARING=${ENABLE_COMMUNITY_SHARING:-false}
+      - ENABLE_RAG=${ENABLE_RAG:-true}
+      - ENABLE_WEB_SEARCH=${ENABLE_WEB_SEARCH:-false}
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-false}
+
+      # File Upload Configuration
+      - ENABLE_FILE_UPLOAD=${ENABLE_FILE_UPLOAD:-true}
+      - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-25}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1600}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-100}
+
+      # Advanced Features
+      - ENABLE_ADMIN_EXPORT=${ENABLE_ADMIN_EXPORT:-true}
+      - ENABLE_ADMIN_CHAT_ACCESS=${ENABLE_ADMIN_CHAT_ACCESS:-true}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      hayhooks:
+        condition: service_healthy
+    networks:
+      - haystack-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webui.rule=PathPrefix(`/`)"
+      - "traefik.http.services.webui.loadbalancer.server.port=8080"
+
+  # =================================================================
+  # REDIS SERVICE - Caching Layer
+  # =================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - haystack-network
+    labels:
+      - "traefik.enable=false"
+
+  # =================================================================
+  # STREAMLIT SERVICE - Document Upload Interface
+  # =================================================================
+  streamlit-upload:
+    build:
+      context: ./streamlit-upload
+      dockerfile: Dockerfile
+    container_name: streamlit-upload
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    volumes:
+      - ./data/uploads:/app/uploads
+      - ./data/documents:/app/documents:ro
+      - streamlit-logs:/logs
+    env_file:
+      - .env
+    environment:
+      # Streamlit Configuration
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+      - STREAMLIT_SERVER_HEADLESS=true
+
+      # Integration URLs
+      - HAYHOOKS_URL=http://hayhooks:1416
+      - HAYHOOKS_API_URL=http://hayhooks:8000
+      - RAG_API_URL=http://hayhooks:8000/api
+      - REDIS_URL=redis://redis:6379/0
+
+      # API Keys (passed through from .env)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+
+      # Upload Configuration
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-50}
+      - UPLOAD_DIR=/app/uploads
+      - ENABLE_CACHE=${ENABLE_CACHE:-true}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      redis:
+        condition: service_healthy
+      hayhooks:
+        condition: service_healthy
+    networks:
+      - haystack-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.streamlit.rule=PathPrefix(`/upload`)"
+      - "traefik.http.services.streamlit.loadbalancer.server.port=8501"
+
+  # =================================================================
+  # MERMAID VISUALIZER SERVICE - Pipeline Visualization
+  # =================================================================
+  mermaid-visualizer:
+    image: ghcr.io/jihchi/mermaid.ink:latest
+    container_name: mermaid-visualizer
+    platform: linux/amd64
+    ports:
+      - "${MERMAID_PORT:-3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - haystack-network
+    profiles:
+      - visualization
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mermaid.rule=PathPrefix(`/visualize`)"
+      - "traefik.http.services.mermaid.loadbalancer.server.port=3000"
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_ADMIN
+
+  # =================================================================
+  # NGINX PROXY (Optional) - Load Balancer & SSL Termination
+  # =================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+      - hayhooks
+    networks:
+      - haystack-network
+    profiles:
+      - proxy
+    labels:
+      - "traefik.enable=false"
+
+# =================================================================
+# NETWORKS CONFIGURATION
+# =================================================================
+networks:
+  haystack-network:
+    name: ${NETWORK_NAME:-haystack-network}
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# =================================================================
+# VOLUMES CONFIGURATION
+# =================================================================
+volumes:
+  # Application data
+  hayhooks-logs:
+    name: hayhooks-logs
+  streamlit-logs:
+    name: streamlit-logs
+  redis-data:
+    name: redis-data
+  nginx-logs:
+    name: nginx-logs
+
+  # Document storage (mapped to host)
+  documents:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/documents
+
+  uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/uploads

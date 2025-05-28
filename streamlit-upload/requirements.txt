@@ -1,0 +1,42 @@
+# Streamlit Document Upload Application Requirements
+
+# Core web frameworks
+streamlit>=1.28.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# File handling and async operations
+aiofiles>=23.2.0
+python-multipart>=0.0.6
+
+# Document processing libraries
+PyPDF2>=3.0.1
+python-docx>=1.1.0
+pandas>=2.1.0
+
+# HTTP requests and API testing
+requests>=2.31.0
+
+# Data validation and serialization
+pydantic>=2.4.0
+
+# Optional dependencies for enhanced functionality
+# markdown>=3.5.0  # For markdown processing
+# python-magic>=0.4.27  # For MIME type detection (Linux)
+# Note: python-magic-bin is for Windows/Mac, python-magic for Linux
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Utilities
+python-dateutil>=2.8.2
+pillow>=10.0.0
+
+# Optional: Enhanced file type detection
+python-magic>=0.4.27
+
+# Future integrations (will be used in next subtasks)
+# openai>=1.0.0
+# pinecone-client>=2.2.4
+# redis>=5.0.0 

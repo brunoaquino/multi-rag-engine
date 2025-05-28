@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haystack Pipeline Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        select, button {
+            padding: 12px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, button:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            min-width: 120px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .pipeline-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .pipeline-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #4facfe;
+        }
+
+        .info-item strong {
+            display: block;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .visualization-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .visualization-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e1e5e9;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .download-buttons button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .mermaid-code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                width: 100%;
+            }
+            
+            .download-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Haystack Pipeline Visualizer</h1>
+            <p>Visualize and analyze your Haystack RAG and Chat pipelines</p>
+        </div>
+        
+        <div class="content">
+            <!-- Controls -->
+            <div class="controls">
+                <div class="control-group">
+                    <label for="pipelineSelect">Pipeline:</label>
+                    <select id="pipelineSelect">
+                        <option value="">Select a pipeline...</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="formatSelect">Format:</label>
+                    <select id="formatSelect">
+                        <option value="mermaid-image">PNG Image</option>
+                        <option value="mermaid-text">Mermaid Code</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button id="visualizeBtn">🎨 Generate Visualization</button>
+                </div>
+                
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button id="refreshBtn">🔄 Refresh Pipelines</button>
+                </div>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="statusContainer"></div>
+
+            <!-- Pipeline Information -->
+            <div id="pipelineInfo" class="pipeline-info hidden">
+                <h3>Pipeline Information</h3>
+                <div id="infoContent" class="info-grid"></div>
+            </div>
+
+            <!-- Visualization Container -->
+            <div id="visualizationContainer" class="visualization-container">
+                <div class="loading hidden" id="loadingIndicator">
+                    <div class="spinner"></div>
+                    <p>Generating visualization...</p>
+                </div>
+                <p id="placeholderText">Select a pipeline and click "Generate Visualization" to begin</p>
+            </div>
+
+            <!-- Download Section -->
+            <div id="downloadSection" class="download-section hidden">
+                <h3>Download Options</h3>
+                <div class="download-buttons">
+                    <button id="downloadPngBtn">📥 Download PNG</button>
+                    <button id="downloadMermaidBtn">📄 Download Mermaid Code</button>
+                    <button id="viewMermaidBtn">👁️ View Mermaid Code</button>
+                </div>
+            </div>
+
+            <!-- Mermaid Code Display -->
+            <div id="mermaidCodeContainer" class="hidden">
+                <h3>Mermaid Diagram Code</h3>
+                <pre id="mermaidCode" class="mermaid-code"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PipelineVisualizer {
+            constructor() {
+                this.baseUrl = window.location.origin;
+                this.currentPipeline = null;
+                this.currentVisualization = null;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadPipelines();
+                this.checkVisualizationHealth();
+            }
+
+            bindEvents() {
+                document.getElementById('visualizeBtn').addEventListener('click', () => this.generateVisualization());
+                document.getElementById('refreshBtn').addEventListener('click', () => this.loadPipelines());
+                document.getElementById('pipelineSelect').addEventListener('change', (e) => this.onPipelineChange(e.target.value));
+                document.getElementById('downloadPngBtn').addEventListener('click', () => this.downloadVisualization('png'));
+                document.getElementById('downloadMermaidBtn').addEventListener('click', () => this.downloadVisualization('mermaid'));
+                document.getElementById('viewMermaidBtn').addEventListener('click', () => this.viewMermaidCode());
+            }
+
+            async loadPipelines() {
+                try {
+                    this.showStatus('Loading available pipelines...', 'info');
+                    const response = await fetch(`${this.baseUrl}/visualize/pipelines`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.populatePipelineSelect(data.available_pipelines);
+                        this.showStatus(`Found ${data.total_count} available pipelines`, 'success');
+                    } else {
+                        throw new Error(data.detail || 'Failed to load pipelines');
+                    }
+                } catch (error) {
+                    this.showStatus(`Error loading pipelines: ${error.message}`, 'error');
+                }
+            }
+
+            populatePipelineSelect(pipelines) {
+                const select = document.getElementById('pipelineSelect');
+                select.innerHTML = '<option value="">Select a pipeline...</option>';
+                
+                pipelines.forEach(pipeline => {
+                    const option = document.createElement('option');
+                    option.value = pipeline.name;
+                    option.textContent = `${pipeline.name} (${pipeline.type})`;
+                    select.appendChild(option);
+                });
+            }
+
+            async onPipelineChange(pipelineName) {
+                if (!pipelineName) {
+                    this.hidePipelineInfo();
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${this.baseUrl}/visualize/pipeline/${pipelineName}/info`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.currentPipeline = pipelineName;
+                        this.showPipelineInfo(data);
+                    } else {
+                        throw new Error(data.detail || 'Failed to load pipeline info');
+                    }
+                } catch (error) {
+                    this.showStatus(`Error loading pipeline info: ${error.message}`, 'error');
+                }
+            }
+
+            showPipelineInfo(info) {
+                const container = document.getElementById('pipelineInfo');
+                const content = document.getElementById('infoContent');
+                
+                content.innerHTML = `
+                    <div class="info-item">
+                        <strong>Pipeline Name</strong>
+                        ${info.pipeline_name}
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Components</strong>
+                        ${info.total_components}
+                    </div>
+                    <div class="info-item">
+                        <strong>Components</strong>
+                        ${info.components.map(c => c.name || c).join(', ')}
+                    </div>
+                    <div class="info-item">
+                        <strong>Connections</strong>
+                        ${info.connections.length} connections
+                    </div>
+                `;
+                
+                container.classList.remove('hidden');
+            }
+
+            hidePipelineInfo() {
+                document.getElementById('pipelineInfo').classList.add('hidden');
+            }
+
+            async generateVisualization() {
+                if (!this.currentPipeline) {
+                    this.showStatus('Please select a pipeline first', 'error');
+                    return;
+                }
+
+                const format = document.getElementById('formatSelect').value;
+                const visualizeBtn = document.getElementById('visualizeBtn');
+                
+                try {
+                    visualizeBtn.disabled = true;
+                    this.showLoading(true);
+                    this.hideDownloadSection();
+                    this.hideMermaidCode();
+
+                    const response = await fetch(`${this.baseUrl}/visualize/pipeline/${this.currentPipeline}/visualize`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            pipeline_name: this.currentPipeline,
+                            format: format,
+                            super_component_expansion: true,
+                            use_local_server: true
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.currentVisualization = data;
+                        
+                        if (format === 'mermaid-image') {
+                            await this.displayImage(data.download_url);
+                        } else {
+                            await this.displayMermaidCode();
+                        }
+                        
+                        this.showDownloadSection();
+                        this.showStatus('Visualization generated successfully!', 'success');
+                    } else {
+                        throw new Error(data.detail || 'Failed to generate visualization');
+                    }
+                } catch (error) {
+                    this.showStatus(`Error generating visualization: ${error.message}`, 'error');
+                } finally {
+                    visualizeBtn.disabled = false;
+                    this.showLoading(false);
+                }
+            }
+
+            async displayImage(downloadUrl) {
+                const container = document.getElementById('visualizationContainer');
+                const img = document.createElement('img');
+                img.src = `${this.baseUrl}${downloadUrl}`;
+                img.alt = 'Pipeline Visualization';
+                img.onload = () => {
+                    container.innerHTML = '';
+                    container.appendChild(img);
+                };
+                img.onerror = () => {
+                    this.showStatus('Error loading visualization image', 'error');
+                };
+            }
+
+            async displayMermaidCode() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/visualize/pipeline/${this.currentPipeline}/mermaid`);
+                    const mermaidCode = await response.text();
+                    
+                    if (response.ok) {
+                        const container = document.getElementById('visualizationContainer');
+                        container.innerHTML = `
+                            <div style="text-align: left; width: 100%;">
+                                <h3>Mermaid Diagram Code</h3>
+                                <pre class="mermaid-code">${this.escapeHtml(mermaidCode)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        throw new Error('Failed to load Mermaid code');
+                    }
+                } catch (error) {
+                    this.showStatus(`Error loading Mermaid code: ${error.message}`, 'error');
+                }
+            }
+
+            async viewMermaidCode() {
+                if (!this.currentPipeline) return;
+                
+                try {
+                    const response = await fetch(`${this.baseUrl}/visualize/pipeline/${this.currentPipeline}/mermaid`);
+                    const mermaidCode = await response.text();
+                    
+                    if (response.ok) {
+                        document.getElementById('mermaidCode').textContent = mermaidCode;
+                        document.getElementById('mermaidCodeContainer').classList.remove('hidden');
+                    } else {
+                        throw new Error('Failed to load Mermaid code');
+                    }
+                } catch (error) {
+                    this.showStatus(`Error loading Mermaid code: ${error.message}`, 'error');
+                }
+            }
+
+            async downloadVisualization(type) {
+                if (!this.currentVisualization) return;
+                
+                try {
+                    let url;
+                    if (type === 'png') {
+                        url = `${this.baseUrl}${this.currentVisualization.download_url}`;
+                    } else {
+                        url = `${this.baseUrl}/visualize/pipeline/${this.currentPipeline}/mermaid`;
+                    }
+                    
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = type === 'png' ? 
+                        `${this.currentPipeline}_visualization.png` : 
+                        `${this.currentPipeline}_diagram.mmd`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl);
+                    
+                    this.showStatus(`${type.toUpperCase()} downloaded successfully!`, 'success');
+                } catch (error) {
+                    this.showStatus(`Error downloading ${type}: ${error.message}`, 'error');
+                }
+            }
+
+            async checkVisualizationHealth() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/visualize/health`);
+                    const data = await response.json();
+                    
+                    if (response.ok && data.status === 'healthy') {
+                        this.showStatus('Visualization service is healthy', 'success');
+                    } else {
+                        this.showStatus('Visualization service is not available', 'error');
+                    }
+                } catch (error) {
+                    this.showStatus('Could not connect to visualization service', 'error');
+                }
+            }
+
+            showLoading(show) {
+                const loading = document.getElementById('loadingIndicator');
+                const placeholder = document.getElementById('placeholderText');
+                
+                if (show) {
+                    loading.classList.remove('hidden');
+                    placeholder.style.display = 'none';
+                } else {
+                    loading.classList.add('hidden');
+                    placeholder.style.display = 'block';
+                }
+            }
+
+            showDownloadSection() {
+                document.getElementById('downloadSection').classList.remove('hidden');
+            }
+
+            hideDownloadSection() {
+                document.getElementById('downloadSection').classList.add('hidden');
+            }
+
+            hideMermaidCode() {
+                document.getElementById('mermaidCodeContainer').classList.add('hidden');
+            }
+
+            showStatus(message, type) {
+                const container = document.getElementById('statusContainer');
+                container.innerHTML = `<div class="status ${type}">${message}</div>`;
+                
+                // Auto-hide success messages after 5 seconds
+                if (type === 'success') {
+                    setTimeout(() => {
+                        container.innerHTML = '';
+                    }, 5000);
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        // Initialize the visualizer when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new PipelineVisualizer();
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,121 @@
+version: "3.8"
+
+services:
+  # Combined service (Streamlit + FastAPI)
+  document-upload:
+    build:
+      context: .
+      dockerfile: Dockerfile.multi
+      target: combined-prod
+    container_name: document-upload-app
+    ports:
+      - "8502:8502" # Streamlit
+      - "8503:8503" # FastAPI
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./logs:/var/log/supervisor
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8502/_stcore/health",
+          "&&",
+          "curl",
+          "-f",
+          "http://localhost:8503/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Separate Streamlit service (alternative deployment)
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.multi
+      target: streamlit-prod
+    container_name: streamlit-frontend
+    ports:
+      - "8502:8502"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+      - API_BASE_URL=http://fastapi:8503
+    restart: unless-stopped
+    depends_on:
+      - fastapi
+    profiles:
+      - separate
+
+  # Separate FastAPI service (alternative deployment)
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.multi
+      target: fastapi-prod
+    container_name: fastapi-backend
+    ports:
+      - "8503:8503"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+    restart: unless-stopped
+    profiles:
+      - separate
+
+  # Development service
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.multi
+      target: development
+    container_name: document-upload-dev
+    ports:
+      - "8502:8502"
+      - "8503:8503"
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    profiles:
+      - dev
+    command: /bin/bash
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: document-upload-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - document-upload
+    restart: unless-stopped
+    profiles:
+      - proxy
+
+volumes:
+  uploads:
+  results:
+  logs:
+
+networks:
+  default:
+    name: document-upload-network

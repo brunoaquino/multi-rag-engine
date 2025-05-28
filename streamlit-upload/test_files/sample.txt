@@ -1,0 +1,9 @@
+Document Processing Test
+        
+This is a sample text document for testing the document processor.
+It contains multiple paragraphs with various types of content.
+
+The processor should be able to extract this text and create appropriate chunks
+for further processing in the RAG pipeline.
+
+This document serves as a basic test case for TXT format processing.

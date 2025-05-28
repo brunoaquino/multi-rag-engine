@@ -1,0 +1,26 @@
+{
+  "title": "JSON Test Document",
+  "description": "Sample JSON data for testing",
+  "items": [
+    {
+      "id": 1,
+      "name": "Item One",
+      "value": 100
+    },
+    {
+      "id": 2,
+      "name": "Item Two",
+      "value": 200
+    },
+    {
+      "id": 3,
+      "name": "Item Three",
+      "value": 300
+    }
+  ],
+  "metadata": {
+    "created": "2024-01-01",
+    "version": "1.0",
+    "author": "Test Author"
+  }
+}

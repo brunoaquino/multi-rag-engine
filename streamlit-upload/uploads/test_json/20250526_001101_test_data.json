@@ -1,0 +1,8 @@
+{
+  "title": "Test Document",
+  "content": "This is JSON content for API testing",
+  "metadata": {
+    "author": "API Test",
+    "version": "1.0"
+  }
+}

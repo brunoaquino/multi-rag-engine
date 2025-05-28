@@ -1,0 +1,54 @@
+# =================================================================
+# Hayhooks Requirements - Python Dependencies
+# =================================================================
+# Dependencies for Haystack + OpenWebUI integration with external APIs
+
+# Core Haystack and framework
+haystack-ai>=2.0.0
+hayhooks>=0.5.0
+
+# AI Provider APIs
+openai>=1.3.0
+anthropic>=0.5.0
+
+# Vector Database
+pinecone-client>=3.0.0
+
+# Caching and Data Storage
+redis>=4.5.1
+python-dotenv>=1.0.0
+
+# Web Framework and API
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+pydantic>=2.0.0
+
+# HTTP and Networking
+httpx>=0.24.0
+requests>=2.31.0
+aiohttp>=3.8.0
+
+# Document Processing
+python-docx>=0.8.11
+PyPDF2>=3.0.1
+markdownify>=0.11.6
+
+# Data Handling
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Logging and Monitoring
+structlog>=23.1.0
+
+# Utilities
+python-json-logger>=2.0.7
+tenacity>=8.2.0
+
+# RAG Pipeline specific dependencies
+pinecone-haystack>=1.0.0
+sentence-transformers>=2.2.2
+transformers>=4.36.0
+torch>=2.1.2
+pypdf>=3.17.4
+accelerate>=0.24.0 
